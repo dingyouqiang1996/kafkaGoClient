@@ -30,7 +30,7 @@ type KafkaConfig struct {
 }
 
 func init() {
-    cfgPath := "config.yml"
+    cfgPath := "/app/config.yml"
 
     data, err := os.ReadFile(cfgPath)
     if err != nil {
