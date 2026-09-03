@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"kafkaGoClient/config"
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -14,66 +13,39 @@ func main() {
 	c := config.C
 	conf := config.KafkaConf
 
-	subscribe(c, conf.Topic)
-	seekToOffset(c, conf.Topic, conf.StartOffset)
-	endOffset := conf.EndOffset
-	readMessages(c, endOffset)
+	assignPartition(c, conf.Topic, conf.StartOffset)
+	readMessages(c, conf.EndOffset)
 }
 
-// 订阅topic
-func subscribe(c *kafka.Consumer, topic string) {
-	err := c.Subscribe(topic, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	for {
-		ev := c.Poll(1000)
-		if ev == nil {
-			continue
-		}
-		switch e := ev.(type) {
-		case *kafka.AssignedPartitions:
-			fmt.Println("Partitions assigned:", e.Partitions)
-			return
-		case *kafka.Error:
-			panic(fmt.Sprintf("Consumer error: %v", e))
-		}
-	}
-}
-
-// 设置Offset
-func seekToOffset(c *kafka.Consumer, topic string, offset int64) {
+// 分配partition并定位offset
+func assignPartition(c *kafka.Consumer, topic string, offset int64) {
 	tp := kafka.TopicPartition{
 		Topic:     &topic,
 		Partition: 0,
 		Offset:    kafka.Offset(offset),
 	}
 
-	err := c.Seek(tp, -1)
-	if err != nil {
-		panic(fmt.Sprintf("Seek failed: %v", err))
+	if err := c.Assign([]kafka.TopicPartition{tp}); err != nil {
+		panic(fmt.Sprintf("Assign failed: %v", err))
 	}
 
-	fmt.Println("Seek done, start reading...")
+	fmt.Printf("Assigned partition 0 at offset %d\n", offset)
 }
 
 // 读取消息至endOffset
 func readMessages(c *kafka.Consumer, endOffset int64) {
 	for {
-		msg, err := c.ReadMessage(5 * time.Second)
+		msg, err := c.ReadMessage(-1)
 		if err != nil {
-			fmt.Printf("Read error or timeout: %v\n", err)
+			fmt.Printf("Read done: %v\n", err)
 			break
 		}
 
 		currentOffset := int64(msg.TopicPartition.Offset)
 		if currentOffset > endOffset {
-			fmt.Println("Reached end offset, stop.")
 			break
 		}
 
 		fmt.Println(string(msg.Value))
 	}
 }
-
