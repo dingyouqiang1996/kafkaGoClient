@@ -26,6 +26,20 @@ func subscribe(c *kafka.Consumer, topic string) {
 	if err != nil {
 		panic(err)
 	}
+
+	for {
+		ev := c.Poll(1000)
+		if ev == nil {
+			continue
+		}
+		switch e := ev.(type) {
+		case *kafka.AssignedPartitions:
+			fmt.Println("Partitions assigned:", e.Partitions)
+			return
+		case *kafka.Error:
+			panic(fmt.Sprintf("Consumer error: %v", e))
+		}
+	}
 }
 
 // 设置Offset
